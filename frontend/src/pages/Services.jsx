@@ -1,0 +1,214 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import { FaCircleUser } from "react-icons/fa6";
+import Navbar from "../components/Navbar";
+import toast from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
+import BookingModal from "./BookingModal";
+
+const Services = () => {
+  const [services, setServices] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [token, setToken] = useState(null); // Define token as state
+
+  const [showModal, setShowModal] = useState(false);
+  const [currentService, setCurrentService] = useState(null);
+
+  const navigate = useNavigate();
+
+  // Check token
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user"));
+    const userToken = userData?.token;
+    if (userToken) {
+      setIsLoggedIn(true);
+      setToken(userToken); // Set token in state
+    } else {
+      setIsLoggedIn(false);
+      setToken(null);
+    }
+  }, []);
+
+  // Fetch services
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:4001/api/v1/services/services`,
+          {
+            withCredentials: true,
+          }
+        );
+        console.log(response.data.services);
+        setServices(response.data.services);
+        setLoading(false);
+      } catch (error) {
+        console.log("error in fetchServices ", error);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  // Logout
+  const handleLogout = async () => {
+    try {
+      const response = await axios.get(
+        `http://localhost:4001/api/v1/user/logout`,
+        {
+          withCredentials: true,
+        }
+      );
+      toast.success(response.data.message);
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      setIsLoggedIn(false);
+      navigate("/");
+    } catch (error) {
+      console.log("Error in logging out ", error);
+      toast.error(error.response.data.errors || "Error in logging out");
+    }
+  };
+
+  // add to wish-list
+  const handleAddToWishList = async (serviceId) => {
+    try {
+      const res = await axios.post(
+        "http://localhost:4001/api/v1/user/wish-list",
+        { serviceId, quantity: 1 },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, //  send token
+          },
+          withCredentials: true,
+        }
+      );
+
+      toast.success("Service added to wish-list!");
+      console.log("wish-list updated:", res.data);
+    } catch (error) {
+      console.error("Error adding to wish-list:", error);
+      toast.error("Failed add to wish-list");
+    }
+  };
+
+  // Toggle sidebar for mobile devices
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  return (
+    <div className="flex">
+      {/* Navbar */}
+      <Navbar />
+
+      {/* Main content */}
+      <main className="ml-0 md:ml-64 w-full bg-white p-10">
+        <header className="flex justify-between items-center mb-10">
+          <h1 className="text-xl font-bold">All Services</h1>
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center">
+              <input
+                type="text"
+                placeholder="Type here to search..."
+                className="border border-gray-300 rounded-l-full px-4 py-2 h-10 focus:outline-none"
+              />
+              {/* <button className="h-10 border border-gray-300 rounded-r-full px-4 flex items-center justify-center">
+                <FiSearch className="text-xl text-gray-600" />
+              </button> */}
+            </div>
+
+            <FaCircleUser className="text-4xl text-blue-600" />
+          </div>
+        </header>
+
+        {/* Vertically Scrollable Services Section */}
+        <div className="overflow-y-auto h-[75vh]">
+          {loading ? (
+            <p className="text-center text-gray-500">Loading...</p>
+          ) : services.length === 0 ? (
+            // Check if services array is empty
+            <p className="text-center text-gray-500">
+              No services posted yet by admin
+            </p>
+          ) : (
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {services.map((service) => (
+                <div
+                  key={service._id}
+                  className="border border-gray-200 rounded-lg p-4 shadow-lg"
+                >
+                  {/* Service Image */}
+                  <div className="overflow-hidden rounded-xl">
+                    <img
+                      src={service.image?.url}
+                      alt={service.title}
+                      className="rounded-xl mb-4 h-48 w-full object-cover transform hover:scale-105 transition duration-300"
+                    />
+                  </div>
+
+                  {/* Title + Category */}
+                  <h2 className="font-bold text-lg mb-1">{service.title}</h2>
+                  <span className="text-sm text-blue-600 font-medium mb-2 block">
+                    {service.category}
+                  </span>
+
+                  {/* Description */}
+                  <p className="text-gray-600 mb-4">
+                    {service.description.length > 100
+                      ? `${service.description.slice(0, 100)}...`
+                      : service.description}
+                  </p>
+                  {/* Price */}
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="font-bold text-xl">
+                      ₹{service.price}{" "}
+                      {/* <span className="text-gray-500 line-through">₹599</span> */}
+                    </span>
+                    {/* <span className="text-green-600">20% off</span> */}
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex gap-3">
+                    <Link
+                      // to={`/book-services/${service._id}`}
+                      onClick={() => {
+                        setCurrentService(service); // set the service user clicked
+                        setShowModal(true); // open modal
+                      }}
+                      className="bg-orange-500 flex-1 text-center text-white px-4 py-2 rounded-lg hover:bg-blue-900 duration-300"
+                    >
+                      Book Now
+                    </Link>
+
+                    <button
+                      onClick={() => handleAddToWishList(service._id)}
+                      className="bg-blue-500 flex-1 text-center text-white px-4 py-2 rounded-lg hover:bg-blue-700 duration-300"
+                    >
+                      Wish-List
+                    </button>
+                  </div>
+                  {/* Booking Modal code  */}
+
+                  {currentService && (
+                    <BookingModal
+                      show={showModal}
+                      onClose={() => {
+                        setShowModal(false);
+                        setCurrentService(null);
+                      }}
+                      service={currentService} // Pass the selected service to the modal
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default Services;
